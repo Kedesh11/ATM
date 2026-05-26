@@ -1,0 +1,14 @@
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/bin/Debug/net8.0/StandaloneTests
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/bin/Debug/net8.0/StandaloneTests.deps.json
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/bin/Debug/net8.0/StandaloneTests.runtimeconfig.json
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/bin/Debug/net8.0/StandaloneTests.dll
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/bin/Debug/net8.0/StandaloneTests.pdb
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.GeneratedMSBuildEditorConfig.editorconfig
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.AssemblyInfoInputs.cache
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.AssemblyInfo.cs
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.csproj.CoreCompileInputs.cache
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.dll
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/refint/StandaloneTests.dll
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.pdb
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/StandaloneTests.genruntimeconfig.cache
+/home/sevan/Documents/ME/AtmLogAgent/tests/StandaloneTests/obj/Debug/net8.0/ref/StandaloneTests.dll

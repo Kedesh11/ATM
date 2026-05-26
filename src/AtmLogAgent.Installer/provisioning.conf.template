@@ -1,0 +1,23 @@
+# ============================================================
+#  FICHIER DE PROVISIONNEMENT ATM — AtmLogAgent
+#  Déposé UNE SEULE FOIS par le technicien bancaire lors de
+#  l'installation initiale de l'ATM.
+#
+#  EMPLACEMENT :
+#    Linux   : /etc/atm-agent/provisioning.conf
+#    Windows : C:\ProgramData\AtmLogAgent\provisioning.conf
+#
+#  FORMAT : clé=valeur (INI minimal, commentaires avec #)
+#  SEUL BankName est obligatoire — les autres champs sont
+#  auto-détectés par l'agent.
+# ============================================================
+
+# Nom de la banque (OBLIGATOIRE)
+# Utilisé pour construire l'arborescence SFTP : BGFI/GABON/LIBREVILLE/ATM-xxx
+BankName=BGFI
+
+# Code interne de la banque (optionnel, informatif)
+BankCode=BGFI-GBN
+
+# Région de déploiement (optionnel, si la ville détectée est imprécise)
+# Region=ESTUAIRE
