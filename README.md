@@ -14,50 +14,51 @@
   - Buffer local propulsé par **SQLite WAL chiffré en AES-256-GCM**.
   - Clés privées (ED25519) hachées par `SHA-256`.
   - Intégration de `DPAPI` pour la protection des données sur les environnements Windows matériels.
-- ⚙️ **Service Natif OS** : S'exécute nativement sous forme de Service Windows (SCM) ou de daemon `systemd` sous Linux.
 - 📜 **Parsing Avancé** : Décode et masque à la volée les fichiers propriétaires `.jrn` des fabricants (NCR, Diebold Nixdorf).
 
-## 📂 Structure du projet
+---
 
+## 🚀 Processus d'Installation de bout-en-bout (Windows ATM)
+
+L'installation sur les terminaux bancaires (NCR, Diebold, Wincor) équipés de Windows est totalement automatisée grâce à notre installeur PowerShell "Zero-Touch".
+
+### Étape 1 : Préparation du Binaire
+L'agent doit être compilé en un exécutable autonome (sans dépendance .NET requise sur la machine cible).
+Sur votre machine de développement :
 ```bash
-AtmLogAgent/
-├── src/
-│   ├── AtmLogAgent.Core/     # Moteur (Cryptographie, SFTP, Parseurs)
-│   └── AtmLogAgent.Service/  # Exécutable natif (Worker Service)
-├── scripts/
-│   └── windows/
-│       └── install.ps1       # Installeur PowerShell "Zero-Touch"
-└── docs/                     # Documentations d'architecture
+dotnet publish src/AtmLogAgent.Service/AtmLogAgent.Service.csproj -c Release -r win-x64 --self-contained true
 ```
 
-## 🚀 Installation & Déploiement
+### Étape 2 : Déploiement sur l'ATM
+Transférez le dossier contenant l'exécutable `AtmLogAgent.Service.exe` et le script `install.ps1` sur l'ATM cible.
 
-### Déploiement Windows (Recommandé pour les ATMs)
-
-1. **Compilation** de l'agent en exécutable autonome :
-   ```bash
-   dotnet publish src/AtmLogAgent.Service/AtmLogAgent.Service.csproj -c Release -r win-x64 --self-contained true
-   ```
-2. **Installation sur l'ATM** : Ouvrez un terminal PowerShell en tant qu'Administrateur et lancez le script (qui copie le binaire, génère la clé SSH, et installe le service Windows) :
+1. Ouvrez un terminal **PowerShell en tant qu'Administrateur**.
+2. Exécutez le script d'installation :
    ```powershell
    .\scripts\windows\install.ps1
    ```
-3. **Autorisation** : Copiez le contenu de `C:\ProgramData\AtmLogAgent\agent.key.pub` vers le serveur SFTP (fichier `authorized_keys`).
 
-### Déploiement Linux
+**Que fait ce script ?**
+- Il copie l'exécutable dans le dossier sécurisé `C:\Program Files\AtmLogAgent\`.
+- Il crée l'environnement de configuration dans `C:\ProgramData\AtmLogAgent\`.
+- Il génère silencieusement une clé cryptographique asymétrique de très haute sécurité (`agent.key` via `ssh-keygen.exe` natif).
+- Il inscrit l'Agent en tant que **Service Windows** auprès du SCM (Service Control Manager) avec un lancement automatique.
+- Il démarre le service immédiatement.
 
-L'application supporte `systemd`. Référez-vous à la documentation détaillée pour les instructions de configuration Linux.
+### Étape 3 : Autorisation de l'ATM sur le Serveur Central (SFTP)
+Pour que l'ATM puisse transmettre ses logs, le serveur SFTP central doit reconnaître sa clé de sécurité.
+1. Récupérez le fichier de clé publique généré par le script sur l'ATM :
+   `C:\ProgramData\AtmLogAgent\agent.key.pub`
+2. Copiez le contenu de ce fichier et ajoutez-le dans le fichier `~/.ssh/authorized_keys` de l'utilisateur `atmagent` sur votre serveur SFTP.
 
-## 📖 Documentation Détaillée
+### Étape 4 : Vérification
+Dès l'étape 3 complétée, l'Agent (qui tourne en arrière-plan) détectera son identité, s'authentifiera sur le serveur SFTP, et commencera la transmission des logs instantanément de manière cryptée et sécurisée.
 
-Pour une plongée en profondeur dans l'architecture, la conformité de sécurité et les mécanismes de retry/résilience, consultez la **[Documentation Officielle](docs/AtmLogAgent_Documentation.md)**.
-
-## 🧪 Tests
-
-Le projet inclut une vaste suite de tests xUnit validant les parseurs, le buffer SQLite et les flux réseau :
-```bash
-dotnet test tests/AtmLogAgent.Tests/
-```
+Vous pouvez vérifier le bon fonctionnement en observant les logs de l'Agent sur l'ATM :
+`C:\ProgramData\AtmLogAgent\Logs\agent-xxxx.log`
 
 ---
-*Développé pour les environnements critiques bancaires.*
+
+## 📖 Documentation d'Architecture
+
+Pour une plongée en profondeur dans l'architecture logicielle, la conformité de sécurité (DPAPI, AES) et les mécanismes de retry/résilience, consultez la **[Documentation Officielle](docs/AtmLogAgent_Documentation.md)**.
