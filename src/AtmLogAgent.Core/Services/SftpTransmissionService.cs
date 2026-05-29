@@ -76,8 +76,7 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
 
                 await Task.Run(() =>
                 {
-                    using var remoteStream = client.OpenWrite(remotePath);
-                    remoteStream.Write(contentBytes, 0, contentBytes.Length);
+                    client.AppendAllText(remotePath, entry.Content + Environment.NewLine, Encoding.UTF8);
                 }, ct);
 
                 _logger.LogDebug("Entry {Id} appended to {Path}", entry.Id, remotePath);

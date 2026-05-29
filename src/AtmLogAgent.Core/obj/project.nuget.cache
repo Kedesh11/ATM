@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "icB4Pz+BDd0=",
+  "dgSpecHash": "BnxJfA7iNDU=",
   "success": true,
   "projectFilePath": "/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/AtmLogAgent.Core.csproj",
   "expectedPackageFiles": [
@@ -12,6 +12,7 @@
     "/home/sevan/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.0/microsoft.extensions.logging.abstractions.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/microsoft.extensions.options/8.0.0/microsoft.extensions.options.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/microsoft.extensions.primitives/8.0.0/microsoft.extensions.primitives.8.0.0.nupkg.sha512",
+    "/home/sevan/.nuget/packages/microsoft.net.illink.tasks/8.0.27/microsoft.net.illink.tasks.8.0.27.nupkg.sha512",
     "/home/sevan/.nuget/packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg.sha512",
     "/home/sevan/.nuget/packages/polly/8.3.1/polly.8.3.1.nupkg.sha512",
     "/home/sevan/.nuget/packages/polly.core/8.3.1/polly.core.8.3.1.nupkg.sha512",
@@ -24,7 +25,9 @@
     "/home/sevan/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.6/sqlitepclraw.lib.e_sqlite3.2.1.6.nupkg.sha512",
     "/home/sevan/.nuget/packages/sqlitepclraw.provider.e_sqlite3/2.1.6/sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512",
     "/home/sevan/.nuget/packages/ssh.net/2024.1.0/ssh.net.2024.1.0.nupkg.sha512",
-    "/home/sevan/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512"
+    "/home/sevan/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512",
+    "/home/sevan/.nuget/packages/microsoft.netcore.app.runtime.win-x64/8.0.27/microsoft.netcore.app.runtime.win-x64.8.0.27.nupkg.sha512",
+    "/home/sevan/.nuget/packages/microsoft.aspnetcore.app.runtime.win-x64/8.0.27/microsoft.aspnetcore.app.runtime.win-x64.8.0.27.nupkg.sha512"
   ],
   "logs": []
 }

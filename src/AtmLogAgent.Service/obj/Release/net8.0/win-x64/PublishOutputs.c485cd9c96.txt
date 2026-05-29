@@ -1,0 +1,5 @@
+/home/sevan/Documents/Projects/ME/AtmLogAgent/atm-simulator/build-context-win/publish/appsettings.json
+/home/sevan/Documents/Projects/ME/AtmLogAgent/atm-simulator/build-context-win/publish/AtmLogAgent.Service.pdb
+/home/sevan/Documents/Projects/ME/AtmLogAgent/atm-simulator/build-context-win/publish/e_sqlite3.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/atm-simulator/build-context-win/publish/AtmLogAgent.Core.pdb
+/home/sevan/Documents/Projects/ME/AtmLogAgent/atm-simulator/build-context-win/publish/AtmLogAgent.Service.exe

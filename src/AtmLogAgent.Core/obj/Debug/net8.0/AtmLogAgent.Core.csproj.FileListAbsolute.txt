@@ -1,0 +1,13 @@
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/bin/Debug/net8.0/AtmLogAgent.Core.deps.json
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/bin/Debug/net8.0/AtmLogAgent.Core.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/bin/Debug/net8.0/AtmLogAgent.Core.pdb
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.csproj.AssemblyReference.cache
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.GeneratedMSBuildEditorConfig.editorconfig
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.AssemblyInfoInputs.cache
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.AssemblyInfo.cs
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.csproj.CoreCompileInputs.cache
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.sourcelink.json
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/refint/AtmLogAgent.Core.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/AtmLogAgent.Core.pdb
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Core/obj/Debug/net8.0/ref/AtmLogAgent.Core.dll
