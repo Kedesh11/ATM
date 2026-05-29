@@ -29,9 +29,10 @@ public sealed class LocalBufferService : IBufferService, IAsyncDisposable
         _config = config.Value;
         _encryption = encryption;
         _logger = logger;
-        _dbPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "AtmLogAgent", "buffer.db");
+        var baseDir = Environment.GetEnvironmentVariable("ATMAGENT_DATA_DIR") 
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            
+        _dbPath = Path.Combine(baseDir, "AtmLogAgent", "buffer.db");
     }
 
     // ──────────────────────────────────────────────

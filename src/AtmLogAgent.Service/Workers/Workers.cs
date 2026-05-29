@@ -142,11 +142,14 @@ public sealed class SyncWorker : BackgroundService
     private readonly AgentConfiguration _config;
     private readonly ILogger<SyncWorker> _logger;
 
+    private CancellationTokenSource? _delayCts;
+
     public SyncWorker(
         ILogDiscoveryService discovery,
         IBufferService buffer,
         ITransmissionService transmission,
         IEncryptionService encryption,
+        ILogWatcherService watcher,
         IOptions<AgentConfiguration> config,
         ILogger<SyncWorker> logger)
     {
@@ -156,6 +159,17 @@ public sealed class SyncWorker : BackgroundService
         _encryption = encryption;
         _config = config.Value;
         _logger = logger;
+
+        watcher.LogEntryReceived += OnLogEntryReceived;
+    }
+
+    private void OnLogEntryReceived(object? sender, LogEntry entry)
+    {
+        if (entry.IsEndOfPeriod)
+        {
+            _logger.LogInformation("EOP detected! Waking up SyncWorker for priority full sync.");
+            _delayCts?.Cancel(); // Force le réveil du Task.Delay
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -173,15 +187,29 @@ public sealed class SyncWorker : BackgroundService
                 await RunFullSyncAsync(stoppingToken);
                 await _buffer.PurgeExpiredDataAsync(stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Full sync failed — will retry next cycle");
             }
 
-            await Task.Delay(
-                TimeSpan.FromHours(_config.Transmission.FullSyncIntervalHours),
-                stoppingToken);
+            try
+            {
+                _delayCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                await Task.Delay(
+                    TimeSpan.FromHours(_config.Transmission.FullSyncIntervalHours),
+                    _delayCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Task.Delay annulé : soit par arrêt global, soit par EOP
+                if (stoppingToken.IsCancellationRequested) break;
+            }
+            finally
+            {
+                _delayCts?.Dispose();
+                _delayCts = null;
+            }
         }
     }
 

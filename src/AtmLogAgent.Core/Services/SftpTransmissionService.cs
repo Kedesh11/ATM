@@ -76,7 +76,10 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
 
                 await Task.Run(() =>
                 {
-                    client.AppendAllText(remotePath, entry.Content + Environment.NewLine, Encoding.UTF8);
+                    // FIX P1.1 — Append binaire strict (contourne les bugs de FileMode.Append de certains serveurs SFTP)
+                    using var stream = client.Open(remotePath, FileMode.OpenOrCreate, FileAccess.Write);
+                    stream.Seek(0, SeekOrigin.End);
+                    stream.Write(contentBytes, 0, contentBytes.Length);
                 }, ct);
 
                 _logger.LogDebug("Entry {Id} appended to {Path}", entry.Id, remotePath);

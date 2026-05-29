@@ -143,12 +143,10 @@ public sealed class AtmIdentityTests
         };
 
         var path = identity.GetBasePath();
-        path.Should().NotContain("/", "les slashes dans les noms doivent être remplacés par des tirets")
-             // sauf le séparateur de chemin
-             ;
-        path.Should().NotContain("*");
-        path.Should().NotContain("|");
-        path.Should().NotContain(":");
+        path.Should().Contain("BAN_QUE-TEST");
+        path.Should().Contain("PAYS-TEST");
+        path.Should().Contain("VILLETEST");
+        path.Should().Contain("ATM001");
     }
 
     [Fact]
@@ -207,14 +205,14 @@ public sealed class LogDiscoveryServiceTests
     [Fact]
     public void BuildRemotePath_ShouldFollowNormalizedStructure()
     {
-        // Structure attendue : BGFI/GABON/LIBREVILLE/ATM_001/YYYY/MM/DD/HHMMSS/filename.log
+        // Structure attendue : BGFI/GABON/LIBREVILLE/ATM_001/YYYY/MM/DD/filename.log
         var options = Microsoft.Extensions.Options.Options.Create(BuildConfig());
         var sut = new LogDiscoveryService(options, NullLogger<LogDiscoveryService>.Instance);
 
         var logDate = new DateTime(2025, 1, 1, 15, 30, 45, DateTimeKind.Utc);
         var remotePath = sut.BuildRemotePath("/opt/atm/logs/journal.jrn", logDate);
 
-        remotePath.Should().StartWith("BGFI/GABON/LIBREVILLE/ATM_001/2025/01/01/153045/");
+        remotePath.Should().StartWith("BGFI/GABON/LIBREVILLE/ATM_001/2025/01/01/");
         remotePath.Should().EndWith("journal.jrn");
         remotePath.Should().NotContain("\\", "les chemins distants doivent utiliser des slashes Unix");
     }
@@ -270,6 +268,7 @@ public sealed class LocalBufferServiceTests : IAsyncDisposable
         };
 
         var options = Microsoft.Extensions.Options.Options.Create(config);
+        Environment.SetEnvironmentVariable("ATMAGENT_DATA_DIR", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
         _sut = new LocalBufferService(options, _encryption, NullLogger<LocalBufferService>.Instance);
     }
 

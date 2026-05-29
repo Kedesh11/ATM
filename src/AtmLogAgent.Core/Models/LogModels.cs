@@ -17,6 +17,7 @@ public sealed class LogEntry
     public TransmissionStatus Status { get; set; } = TransmissionStatus.Pending;
     public int RetryCount { get; set; }
     public string? ErrorMessage { get; set; }
+    public bool IsEndOfPeriod { get; set; } // P3.1 - Détection EOP
 }
 
 /// <summary>
@@ -87,9 +88,21 @@ public sealed class TransmissionStats
 public sealed class DeviceStatus
 {
     public required string DeviceName { get; init; }
-    public int Status { get; init; }
+    public XfsDeviceStatus Status { get; init; } // P3.2 - XFS Device Status
     public int Supply { get; init; }
     public DateTime LastSeenUtc { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// P3.2 — CEN/XFS Standard Device Status Codes
+/// </summary>
+public enum XfsDeviceStatus
+{
+    WFS_STAT_DEVONLINE = 0,
+    WFS_STAT_DEVOFFLINE = 1,
+    WFS_STAT_DEVPOWEROFF = 2,
+    WFS_STAT_DEVNODEVICE = 3,
+    WFS_STAT_DEVHWERROR = 4
 }
 
 public enum TransmissionStatus

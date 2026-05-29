@@ -254,6 +254,5 @@ public sealed class LogDiscoveryService : ILogDiscoveryService
     }
 
     private static string SanitizeFileName(string name) =>
-        Path.GetInvalidFileNameChars()
-            .Aggregate(name, (current, c) => current.Replace(c, '_'));
+        System.Text.RegularExpressions.Regex.Replace(name, @"[^\w\-. ]", "_");
 }

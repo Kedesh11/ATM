@@ -276,6 +276,14 @@ public sealed class LogWatcherService : ILogWatcherService, IDisposable
             var checksum  = Convert.ToBase64String(
                 System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(line)));
 
+            var isEop = false;
+            if (format == LogFormat.Proprietary)
+            {
+                var evt = AtmLogAgent.Core.Parsers.AtmJrnParser.DetectPeriodicEvent(line);
+                if (evt?.EventType == AtmLogAgent.Core.Parsers.PeriodicEventType.Eop)
+                    isEop = true;
+            }
+
             var entry = new LogEntry
             {
                 AtmId          = _config.Atm.AtmId,
@@ -284,7 +292,8 @@ public sealed class LogWatcherService : ILogWatcherService, IDisposable
                 Format         = format,
                 LogTimestamp   = logDate,
                 RemotePath     = remotePath,
-                Checksum       = checksum
+                Checksum       = checksum,
+                IsEndOfPeriod  = isEop
             };
 
             LogEntryReceived?.Invoke(this, entry);

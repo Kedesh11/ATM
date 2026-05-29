@@ -1,0 +1,36 @@
+# .NET build artifacts
+bin/
+obj/
+publish/
+
+# Packages
+*.nupkg
+*.snupkg
+.nuget/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
+coverage/
+
+# Environment specific
+appsettings.*.json
+!appsettings.json
+
+# ATM agent sensitive data
+*.key
+*.pem
+agent.key
+positions.dat
+buffer.db
