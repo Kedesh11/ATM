@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Text;
 using AtmLogAgent.Core.Interfaces;
@@ -23,8 +24,7 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
     private readonly IEncryptionService _encryption;
     private readonly ILogger<SftpTransmissionService> _logger;
     private readonly AsyncRetryPolicy _retryPolicy;
-    private SftpClient? _client;
-    private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private readonly ConcurrentBag<SftpClient> _clientPool = new();
     private bool _disposed;
 
     public SftpTransmissionService(
@@ -53,33 +53,40 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
         return await _retryPolicy.ExecuteAsync(async () =>
         {
             var client = await GetConnectedClientAsync(ct);
-            var remotePath = entry.RemotePath!;
-            EnsureRemoteDirectory(client, Path.GetDirectoryName(remotePath)!.Replace('\\', '/'));
-
-            // ── FIX P1.1 — Append binaire correct ─────────────────────────────────
-            //
-            // AVANT (incorrect) :
-            //   client.UploadFile(stream, remotePath, canOverride: true)
-            //   canOverride:true équivaut à O_WRONLY|O_CREAT|O_TRUNC → ÉCRASE le fichier.
-            //   Après une journée, seule la DERNIÈRE ligne de log serait présente côté
-            //   serveur. Perte totale de l'historique des transactions.
-            //
-            // APRÈS (correct) :
-            //   client.OpenWrite(remotePath) ouvre en O_WRONLY|O_APPEND|O_CREAT.
-            //   Si le fichier n'existe pas : il est créé.
-            //   S'il existe : les données sont ajoutées à la fin (append).
-            //   Sémantique exacte requise pour un journal de transactions ATM.
-
-            var contentBytes = Encoding.UTF8.GetBytes(entry.Content + Environment.NewLine);
-
-            await Task.Run(() =>
+            try
             {
-                using var remoteStream = client.OpenWrite(remotePath);
-                remoteStream.Write(contentBytes, 0, contentBytes.Length);
-            }, ct);
+                var remotePath = entry.RemotePath!;
+                EnsureRemoteDirectory(client, Path.GetDirectoryName(remotePath)!.Replace('\\', '/'));
 
-            _logger.LogDebug("Entry {Id} appended to {Path}", entry.Id, remotePath);
-            return true;
+                // ── FIX P1.1 — Append binaire correct ─────────────────────────────────
+                //
+                // AVANT (incorrect) :
+                //   client.UploadFile(stream, remotePath, canOverride: true)
+                //   canOverride:true équivaut à O_WRONLY|O_CREAT|O_TRUNC → ÉCRASE le fichier.
+                //   Après une journée, seule la DERNIÈRE ligne de log serait présente côté
+                //   serveur. Perte totale de l'historique des transactions.
+                //
+                // APRÈS (correct) :
+                //   client.OpenWrite(remotePath) ouvre en O_WRONLY|O_APPEND|O_CREAT.
+                //   Si le fichier n'existe pas : il est créé.
+                //   S'il existe : les données sont ajoutées à la fin (append).
+                //   Sémantique exacte requise pour un journal de transactions ATM.
+
+                var contentBytes = Encoding.UTF8.GetBytes(entry.Content + Environment.NewLine);
+
+                await Task.Run(() =>
+                {
+                    using var remoteStream = client.OpenWrite(remotePath);
+                    remoteStream.Write(contentBytes, 0, contentBytes.Length);
+                }, ct);
+
+                _logger.LogDebug("Entry {Id} appended to {Path}", entry.Id, remotePath);
+                return true;
+            }
+            finally
+            {
+                ReturnClient(client);
+            }
         });
     }
 
@@ -98,32 +105,39 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
         return await _retryPolicy.ExecuteAsync(async () =>
         {
             var client = await GetConnectedClientAsync(ct);
-            var remotePath = record.RemotePath;
-
-            EnsureRemoteDirectory(client, Path.GetDirectoryName(remotePath)!.Replace('\\', '/'));
-
-            if (_config.Transmission.CompressBeforeTransmit && !record.Compressed)
+            try
             {
-                var tempPath = Path.GetTempFileName();
-                try
-                {
-                    await CompressFileAsync(record.LocalPath, tempPath, ct);
-                    remotePath += ".gz";
-                    await UploadFileWithProgressAsync(client, tempPath, remotePath, ct);
-                }
-                finally
-                {
-                    if (File.Exists(tempPath)) File.Delete(tempPath);
-                }
-            }
-            else
-            {
-                await UploadFileWithProgressAsync(client, record.LocalPath, remotePath, ct);
-            }
+                var remotePath = record.RemotePath;
 
-            _logger.LogInformation("File sync completed: {Local} → {Remote} ({Size:N0} bytes)",
-                Path.GetFileName(record.LocalPath), remotePath, record.FileSizeBytes);
-            return true;
+                EnsureRemoteDirectory(client, Path.GetDirectoryName(remotePath)!.Replace('\\', '/'));
+
+                if (_config.Transmission.CompressBeforeTransmit && !record.Compressed)
+                {
+                    var tempPath = Path.GetTempFileName();
+                    try
+                    {
+                        await CompressFileAsync(record.LocalPath, tempPath, ct);
+                        remotePath += ".gz";
+                        await UploadFileWithProgressAsync(client, tempPath, remotePath, ct);
+                    }
+                    finally
+                    {
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                    }
+                }
+                else
+                {
+                    await UploadFileWithProgressAsync(client, record.LocalPath, remotePath, ct);
+                }
+
+                _logger.LogInformation("File sync completed: {Local} → {Remote} ({Size:N0} bytes)",
+                    Path.GetFileName(record.LocalPath), remotePath, record.FileSizeBytes);
+                return true;
+            }
+            finally
+            {
+                ReturnClient(client);
+            }
         });
     }
 
@@ -132,7 +146,14 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
         try
         {
             var client = await GetConnectedClientAsync(ct);
-            return client.IsConnected;
+            try
+            {
+                return client.IsConnected;
+            }
+            finally
+            {
+                ReturnClient(client);
+            }
         }
         catch (Exception ex)
         {
@@ -215,23 +236,40 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
 
     private async Task<SftpClient> GetConnectedClientAsync(CancellationToken ct)
     {
-        await _connectionLock.WaitAsync(ct);
-        try
+        while (_clientPool.TryTake(out var client))
         {
-            if (_client is { IsConnected: true }) return _client;
-
-            _client?.Dispose();
-            _client = CreateSftpClient();
-            _client.Connect();
-
-            _logger.LogInformation("SFTP connected to {Host}:{Port} as {User}",
-                _config.Transmission.Host, _config.Transmission.Port, _config.Transmission.Username);
-
-            return _client;
+            if (client.IsConnected) return client;
+            client.Dispose(); // Cleanup broken connections
         }
-        finally
+
+        var newClient = CreateSftpClient();
+        await Task.Run(() => newClient.Connect(), ct);
+
+        _logger.LogDebug("SFTP connection pooled to {Host}:{Port}",
+            _config.Transmission.Host, _config.Transmission.Port);
+
+        return newClient;
+    }
+
+    private void ReturnClient(SftpClient client)
+    {
+        if (_disposed)
         {
-            _connectionLock.Release();
+            client.Dispose();
+            return;
+        }
+
+        if (client.IsConnected)
+            _clientPool.Add(client);
+        else
+            client.Dispose();
+    }
+
+    private void ClearPool()
+    {
+        while (_clientPool.TryTake(out var client))
+        {
+            client.Dispose();
         }
     }
 
@@ -374,8 +412,7 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
                     _logger.LogWarning(ex,
                         "SFTP transmission failed (attempt {Attempt}/{Max}). Retrying in {Delay:F0}s...",
                         attempt, _config.Transmission.MaxRetryAttempts, delay.TotalSeconds);
-                    _client?.Dispose();
-                    _client = null;
+                    ClearPool();
                 });
     }
 
@@ -383,8 +420,6 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _client?.Disconnect();
-        _client?.Dispose();
-        _connectionLock.Dispose();
+        ClearPool();
     }
 }
