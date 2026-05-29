@@ -35,6 +35,13 @@ try
         .AddEnvironmentVariables("ATMAGENT_")
         .AddCommandLine(args);
 
+    // ── Hosting (Windows Service / Systemd) ─────────────────
+    builder.Services.AddWindowsService(options =>
+    {
+        options.ServiceName = "AtmLogAgent";
+    });
+    builder.Services.AddSystemd();
+
     // ── Serilog complet ──────────────────────────────────────
     builder.Services.AddSerilog((services, logConfig) =>
     {

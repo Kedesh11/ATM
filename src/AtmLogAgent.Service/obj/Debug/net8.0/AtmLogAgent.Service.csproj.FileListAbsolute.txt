@@ -88,3 +88,4 @@
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Debug/net8.0/AtmLogAgent.Service.pdb
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Debug/net8.0/AtmLogAgent.Service.genruntimeconfig.cache
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Debug/net8.0/ref/AtmLogAgent.Service.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/bin/Debug/net8.0/System.Security.Cryptography.ProtectedData.dll
