@@ -25,7 +25,20 @@ public sealed class EncryptionService : IEncryptionService, IDisposable
     public EncryptionService(ILogger<EncryptionService> logger, string? keyFilePath = null)
     {
         _logger = logger;
-        _masterKey = LoadOrCreateKey(keyFilePath);
+        var loadedKey = LoadOrCreateKey(keyFilePath);
+        
+        // AES-256-GCM exige une clé de 32 octets exactement.
+        // Si le matériel fourni (ex: clé SSH PEM) n'est pas de la bonne taille, on le hache.
+        if (loadedKey.Length != 32)
+        {
+            _logger.LogInformation("La clé chargée ne fait pas 32 octets ({Length} octets). Dérivation d'une clé AES-256 via SHA-256.", loadedKey.Length);
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            _masterKey = sha256.ComputeHash(loadedKey);
+        }
+        else
+        {
+            _masterKey = loadedKey;
+        }
     }
 
     /// <summary>
@@ -143,10 +156,21 @@ public sealed class EncryptionService : IEncryptionService, IDisposable
         {
             var protectedKey = File.ReadAllBytes(path);
             // Sur Windows : déprotéger avec DPAPI (clé liée à la machine)
+#pragma warning disable CA1416 // Validate platform compatibility
             if (OperatingSystem.IsWindows())
             {
-                throw new PlatformNotSupportedException("DPAPI not available without System.Security.Cryptography.ProtectedData");
+                try
+                {
+                    return System.Security.Cryptography.ProtectedData.Unprotect(protectedKey, null, System.Security.Cryptography.DataProtectionScope.LocalMachine);
+                }
+                catch (System.Security.Cryptography.CryptographicException)
+                {
+                    // Fallback pour le simulateur (Wine) où ssh-keygen génère une clé brute
+                    _logger.LogInformation("Clé non protégée par DPAPI détectée. Utilisation de la clé brute (mode simulateur).");
+                    return protectedKey;
+                }
             }
+#pragma warning restore CA1416
             // Sur Linux : la clé est protégée par des permissions OS (mode 600)
             return protectedKey;
         }
@@ -165,15 +189,17 @@ public sealed class EncryptionService : IEncryptionService, IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
         byte[] toWrite;
+#pragma warning disable CA1416 // Validate platform compatibility
         if (OperatingSystem.IsWindows())
         {
             // DPAPI : lie la clé à la machine locale
-            throw new PlatformNotSupportedException("DPAPI not available without System.Security.Cryptography.ProtectedData");
+            toWrite = System.Security.Cryptography.ProtectedData.Protect(key, null, System.Security.Cryptography.DataProtectionScope.LocalMachine);
         }
         else
         {
             toWrite = key;
         }
+#pragma warning restore CA1416
 
         File.WriteAllBytes(path, toWrite);
         SetRestrictivePermissions(path);

@@ -249,3 +249,4 @@
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Release/net8.0/win-x64/AtmLogAgent.Service.pdb
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Release/net8.0/win-x64/AtmLogAgent.Service.genruntimeconfig.cache
 /home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/obj/Release/net8.0/win-x64/ref/AtmLogAgent.Service.dll
+/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/bin/Release/net8.0/win-x64/System.Security.Cryptography.ProtectedData.dll

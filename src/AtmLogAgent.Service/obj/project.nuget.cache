@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "z5nl+dLM12w=",
+  "dgSpecHash": "bKR4WBYtOww=",
   "success": true,
   "projectFilePath": "/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/AtmLogAgent.Service.csproj",
   "expectedPackageFiles": [
@@ -55,6 +55,7 @@
     "/home/sevan/.nuget/packages/system.diagnostics.diagnosticsource/8.0.0/system.diagnostics.diagnosticsource.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/system.diagnostics.eventlog/8.0.0/system.diagnostics.eventlog.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512",
+    "/home/sevan/.nuget/packages/system.security.cryptography.protecteddata/10.0.8/system.security.cryptography.protecteddata.10.0.8.nupkg.sha512",
     "/home/sevan/.nuget/packages/system.serviceprocess.servicecontroller/8.0.0/system.serviceprocess.servicecontroller.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/system.text.encodings.web/8.0.0/system.text.encodings.web.8.0.0.nupkg.sha512",
     "/home/sevan/.nuget/packages/system.text.json/8.0.0/system.text.json.8.0.0.nupkg.sha512",

@@ -24,6 +24,9 @@ try
 
     // ── Configuration ───────────────────────────────────────
     var configDir = args.SkipWhile(a => a != "--configdir").Skip(1).FirstOrDefault() ?? AppContext.BaseDirectory;
+    Log.Information("Configuration directory set to: {ConfigDir}", configDir);
+    Log.Information("appsettings.json exists: {Exists}", File.Exists(Path.Combine(configDir, "appsettings.json")));
+    
     builder.Configuration.SetBasePath(configDir);
 
     builder.Configuration
@@ -147,10 +150,11 @@ try
         var resolved = preResolvedIdentity; // capture pour closure
         builder.Services.PostConfigure<AgentConfiguration>(cfg =>
         {
-            // FIX P2.2 : AgentConfiguration.Atm est maintenant settable (set; au lieu de init;)
-            // Plus besoin de réflexion pour contourner le contrat immutable.
-            // WithResolution() retourne une nouvelle AtmIdentity en respectant les overrides
-            // de la config (valeurs non-AUTO conservées).
+            if (cfg.Atm == null)
+            {
+                Log.Warning("Configuration 'Atm' manquante dans appsettings.json. Initialisation par défaut.");
+                cfg.Atm = new AtmIdentity();
+            }
             cfg.Atm = cfg.Atm.WithResolution(resolved);
         });
     }
