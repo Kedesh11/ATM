@@ -491,7 +491,7 @@ public static class Iso8583ResponseCode
     public static string GetDescription(string? code) =>
         code is not null && Descriptions.TryGetValue(code, out var desc)
             ? desc
-            : $"Code inconnu ({code ?? "null"})";;
+            : $"Code inconnu ({code ?? "null"})";
 
     /// <summary>Vrai si le code indique un problème d'infrastructure interbancaire
     /// (pas un problème de l'ATM lui-même).</summary>

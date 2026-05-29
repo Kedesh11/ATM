@@ -145,7 +145,7 @@ public sealed class EncryptionService : IEncryptionService, IDisposable
             // Sur Windows : déprotéger avec DPAPI (clé liée à la machine)
             if (OperatingSystem.IsWindows())
             {
-                return ProtectedData.Unprotect(protectedKey, null, DataProtectionScope.LocalMachine);
+                throw new PlatformNotSupportedException("DPAPI not available without System.Security.Cryptography.ProtectedData");
             }
             // Sur Linux : la clé est protégée par des permissions OS (mode 600)
             return protectedKey;
@@ -168,7 +168,7 @@ public sealed class EncryptionService : IEncryptionService, IDisposable
         if (OperatingSystem.IsWindows())
         {
             // DPAPI : lie la clé à la machine locale
-            toWrite = ProtectedData.Protect(key, null, DataProtectionScope.LocalMachine);
+            throw new PlatformNotSupportedException("DPAPI not available without System.Security.Cryptography.ProtectedData");
         }
         else
         {

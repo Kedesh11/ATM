@@ -19,11 +19,13 @@ public sealed class HealthMonitorService : IHealthMonitorService, IDisposable
     private readonly HttpClient _httpClient;
     private readonly string _auditLogPath;
     private readonly SemaphoreSlim _auditLock = new(1, 1);
+#pragma warning disable CS0649
     private DateTime? _lastSuccessfulTransmit;
     private DateTime? _lastFullSync;
     private long _totalSent;
     private long _totalBytes;
     private long _totalErrors;
+#pragma warning restore CS0649
     private bool _disposed;
 
     private static readonly string AgentVersion =

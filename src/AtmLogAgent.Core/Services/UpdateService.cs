@@ -130,6 +130,7 @@ public sealed class UpdateService : IUpdateService
 
     public async Task<bool> RollbackAsync(CancellationToken ct = default)
     {
+        await Task.CompletedTask;
         var backups = Directory.EnumerateDirectories(_backupDirectory)
             .OrderByDescending(d => d)
             .Take(1)

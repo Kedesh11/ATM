@@ -23,8 +23,11 @@ try
     var builder = Host.CreateApplicationBuilder(args);
 
     // ── Configuration ───────────────────────────────────────
+    var configDir = args.SkipWhile(a => a != "--configdir").Skip(1).FirstOrDefault() ?? AppContext.BaseDirectory;
+    builder.Configuration.SetBasePath(configDir);
+
     builder.Configuration
-        .AddJsonFile("appsettings.json", optional: false)
+        .AddJsonFile("appsettings.json", optional: true)
         .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
         .AddEnvironmentVariables("ATMAGENT_")
         .AddCommandLine(args);
@@ -37,7 +40,6 @@ try
             "AtmLogAgent", "Logs", "agent-.log");
 
         logConfig
-            .ReadFrom.Configuration(builder.Configuration)
             .ReadFrom.Services(services)
             .Enrich.FromLogContext()
             .Enrich.WithThreadId()
@@ -53,8 +55,7 @@ try
     });
 
     // ── Options ──────────────────────────────────────────────
-    builder.Services.Configure<AgentConfiguration>(
-        builder.Configuration.GetSection("AtmAgent"));
+    builder.Services.Configure<AgentConfiguration>(builder.Configuration);
 
     // ── Services Core ────────────────────────────────────────
     builder.Services.AddSingleton<IEncryptionService>(sp =>
@@ -156,6 +157,7 @@ try
 
     // ─────────────────────────────────────────────────
 
+    var host = builder.Build();
     Log.Information("ATM Log Agent configured — Starting host");
     await host.RunAsync();
 }

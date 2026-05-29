@@ -104,6 +104,11 @@
           },
           "runtimeIdentifierGraphPath": "/home/sevan/.dotnet/sdk/8.0.421/PortableRuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
+        }
       }
     },
     "/home/sevan/Documents/Projects/ME/AtmLogAgent/src/AtmLogAgent.Service/AtmLogAgent.Service.csproj": {
@@ -200,6 +205,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "/home/sevan/.dotnet/sdk/8.0.421/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "linux-x64": {
+          "#import": []
         }
       }
     }
