@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AtmLogAgent.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d6e3cc4435251e9b971fa76949cfd3b52e4a40aa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+224edb14c4dbb4be67ca2548f7e86d2c162dff8b")]
 [assembly: System.Reflection.AssemblyProductAttribute("AtmLogAgent.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AtmLogAgent.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
