@@ -20,35 +20,48 @@
 
 ## 🚀 Processus d'Installation de bout-en-bout (Windows ATM)
 
-L'installation sur les terminaux bancaires (NCR, Diebold, Wincor) équipés de Windows est totalement automatisée grâce à notre installeur PowerShell "Zero-Touch".
+L'installation sur les terminaux bancaires (NCR, Diebold, Wincor) équipés de Windows peut maintenant se faire avec un assistant graphique. L'administrateur saisit les paramètres SFTP et les informations non détectables dans une interface visuelle, puis l'assistant génère la configuration, les clés et le service Windows. L'identifiant ATM et le répertoire de données restent automatiques.
 
-### Étape 1 : Préparation du Binaire
-L'agent doit être compilé en un exécutable autonome (sans dépendance .NET requise sur la machine cible).
-Sur votre machine de développement :
-```bash
-dotnet publish src/AtmLogAgent.Service/AtmLogAgent.Service.csproj -c Release -r win-x64 --self-contained true
+Le mode PowerShell silencieux reste disponible pour les déploiements automatisés.
+
+### Étape 1 : Préparation du bundle Windows
+
+Depuis la racine du projet :
+
+```powershell
+.\scripts\windows\publish-setup.ps1 -SelfContained
 ```
 
+Le dossier généré contient notamment :
+
+- `AtmLogAgent.Service.exe`
+- `AtmLogAgent.SetupWizard.exe`
+
 ### Étape 2 : Déploiement sur l'ATM
-Transférez le dossier contenant l'exécutable `AtmLogAgent.Service.exe` et le script `install.ps1` sur l'ATM cible.
+
+Transférez le dossier `publish\windows-setup\` sur l'ATM cible.
 
 1. Ouvrez un terminal **PowerShell en tant qu'Administrateur**.
-2. Exécutez le script d'installation :
+2. Lancez l'assistant :
    ```powershell
-   .\scripts\windows\install.ps1
+   .\AtmLogAgent.SetupWizard.exe
    ```
+3. Renseignez les champs SFTP, supervision et chemins de logs si l'auto-détection ne suffit pas.
+4. Cliquez sur `Installer`.
 
-**Que fait ce script ?**
+**Que fait l'assistant ?**
 - Il copie l'exécutable dans le dossier sécurisé `C:\Program Files\AtmLogAgent\`.
 - Il crée l'environnement de configuration dans `C:\ProgramData\AtmLogAgent\`.
-- Il génère silencieusement une clé cryptographique asymétrique de très haute sécurité (`agent.key` via `ssh-keygen.exe` natif).
+- Il génère une clé SSH ED25519 `agent_ed25519`.
+- Il génère `appsettings.json` avec la section `AtmAgent`.
+- Il configure le pinning de clé hôte SFTP.
 - Il inscrit l'Agent en tant que **Service Windows** auprès du SCM (Service Control Manager) avec un lancement automatique.
 - Il démarre le service immédiatement.
 
 ### Étape 3 : Autorisation de l'ATM sur le Serveur Central (SFTP)
 Pour que l'ATM puisse transmettre ses logs, le serveur SFTP central doit reconnaître sa clé de sécurité.
 1. Récupérez le fichier de clé publique généré par le script sur l'ATM :
-   `C:\ProgramData\AtmLogAgent\agent.key.pub`
+   `C:\ProgramData\AtmLogAgent\keys\agent_ed25519.pub`
 2. Copiez le contenu de ce fichier et ajoutez-le dans le fichier `~/.ssh/authorized_keys` de l'utilisateur `atmagent` sur votre serveur SFTP.
 
 ### Étape 4 : Vérification
@@ -62,3 +75,7 @@ Vous pouvez vérifier le bon fonctionnement en observant les logs de l'Agent sur
 ## 📖 Documentation d'Architecture
 
 Pour une plongée en profondeur dans l'architecture logicielle, la conformité de sécurité (DPAPI, AES) et les mécanismes de retry/résilience, consultez la **[Documentation Officielle](docs/AtmLogAgent_Documentation.md)**.
+
+Pour le détail des correctifs de durcissement appliqués pour l'exploitation en production ATM (configuration `AtmAgent`, retry buffer, pinning SFTP, mises à jour signées, installateurs), consultez **[Correctifs de Production](docs/Correctifs_Production_AtmLogAgent.md)**.
+
+Pour la procédure détaillée de l'interface graphique Windows, consultez **[Assistant d'installation Windows](docs/Assistant_Installation_Windows.md)**.

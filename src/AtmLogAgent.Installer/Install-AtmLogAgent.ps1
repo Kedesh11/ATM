@@ -31,13 +31,15 @@
 param(
     [string]$ServiceName   = "AtmLogAgent",
     [string]$InstallPath   = "C:\Program Files\AtmLogAgent",
-    [Parameter(Mandatory)][string]$BankName,
-    [Parameter(Mandatory)][string]$Country,
-    [Parameter(Mandatory)][string]$City,
-    [Parameter(Mandatory)][string]$AtmId,
+    [string]$BankName      = "AUTO",
+    [string]$Country       = "AUTO",
+    [string]$City          = "AUTO",
+    [string]$AtmId         = "AUTO",
     [Parameter(Mandatory)][string]$SftpHost,
     [int]$SftpPort         = 22,
-    [Parameter(Mandatory)][string]$SftpUser
+    [Parameter(Mandatory)][string]$SftpUser,
+    [Parameter(Mandatory)][string]$SftpHostKeyFingerprint,
+    [string]$HeartbeatUrl = "https://supervision.example.com/api/heartbeat"
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,7 +99,7 @@ $configContent = @"
       "Host": "$SftpHost",
       "Port": $SftpPort,
       "Username": "$SftpUser",
-      "PrivateKeyPath": "$($DataPath.Replace('\','\\'))\\keys\\agent_rsa",
+      "PrivateKeyPath": "$($DataPath.Replace('\','\\'))\\keys\\agent_ed25519",
       "CompressBeforeTransmit": true,
       "MaxConcurrentTransfers": 3,
       "MaxRetryAttempts": 10,
@@ -109,6 +111,7 @@ $configContent = @"
       "EnableIntegrityChecks": true,
       "EnableTamperDetection": true,
       "ValidateServerCertificate": true,
+      "ServerCertificatePinning": "$SftpHostKeyFingerprint",
       "EnableAuditLog": true,
       "AuditLogPath": "$($DataPath.Replace('\','\\'))\\Logs\\audit.log"
     },
@@ -121,12 +124,14 @@ $configContent = @"
     },
     "Update": {
       "UpdateServerUrl": "https://updates.atm-agent.example.com/api/v1",
+      "UpdatePublicKeyPath": "$($DataPath.Replace('\','\\'))\\keys\\update_pub.pem",
       "CheckIntervalHours": 6,
-      "EnableAutoUpdate": true,
+      "EnableAutoUpdate": false,
+      "AllowHotReload": false,
       "MaxRollbackVersions": 3
     },
     "Monitoring": {
-      "HeartbeatUrl": "https://supervision.example.com/api/heartbeat",
+      "HeartbeatUrl": "$HeartbeatUrl",
       "HeartbeatIntervalSeconds": 60
     },
     "Retention": {
@@ -143,10 +148,10 @@ Write-Host "      Configuration générée" -ForegroundColor Green
 
 # ── Génération de la paire de clés SSH ─────────────────────
 Write-Host "[5/8] Génération de la paire de clés SSH..." -ForegroundColor Yellow
-$keyPath = "$DataPath\keys\agent_rsa"
+$keyPath = "$DataPath\keys\agent_ed25519"
 if (-not (Test-Path $keyPath)) {
-    & ssh-keygen -t rsa -b 4096 -f $keyPath -N "" -C "atm-agent-$AtmId" 2>&1 | Out-Null
-    Write-Host "      Clé RSA 4096 bits générée : $keyPath" -ForegroundColor Green
+    & ssh-keygen -t ed25519 -f $keyPath -N "" -C "atm-agent-$AtmId" 2>&1 | Out-Null
+    Write-Host "      Clé ED25519 générée : $keyPath" -ForegroundColor Green
     Write-Host ""
     Write-Host "      ╔══════════════════════════════════════════╗" -ForegroundColor Yellow
     Write-Host "      ║  ACTION REQUISE : Copier la clé publique ║" -ForegroundColor Yellow

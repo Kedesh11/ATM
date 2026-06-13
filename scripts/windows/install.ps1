@@ -13,6 +13,14 @@
     Note : L'identité de l'ATM (Pays, Ville, Banque, MAC) sera résolue de manière 100% autonome par l'Agent au démarrage.
 #>
 
+param(
+    [string]$SftpHost = $env:ATM_SFTP_HOST,
+    [int]$SftpPort = $(if ($env:ATM_SFTP_PORT) { [int]$env:ATM_SFTP_PORT } else { 22 }),
+    [string]$SftpUser = $(if ($env:ATM_SFTP_USER) { $env:ATM_SFTP_USER } else { "atm-agent" }),
+    [string]$SftpHostKeyFingerprint = $env:ATM_SFTP_HOSTKEY,
+    [string]$HeartbeatUrl = $(if ($env:ATM_HEARTBEAT_URL) { $env:ATM_HEARTBEAT_URL } else { "https://supervision.example.com/api/heartbeat" })
+)
+
 $ErrorActionPreference = "Stop"
 
 # 1. Vérification des droits Administrateur
@@ -26,7 +34,17 @@ $InstallDir = "$env:ProgramFiles\AtmLogAgent"
 $DataDir = "$env:ProgramData\AtmLogAgent"
 $ConfigDir = "$DataDir\config"
 $LogDir = "$DataDir\Logs"
-$KeyPath = "$DataDir\agent.key"
+$KeyDir = "$DataDir\keys"
+$SshKeyPath = "$KeyDir\agent_ed25519"
+$EncryptionKeyPath = "$DataDir\agent.key"
+
+if ([string]::IsNullOrWhiteSpace($SftpHost)) {
+    throw "SftpHost est obligatoire. Passez -SftpHost ou définissez ATM_SFTP_HOST."
+}
+
+if ([string]::IsNullOrWhiteSpace($SftpHostKeyFingerprint)) {
+    throw "SftpHostKeyFingerprint est obligatoire en production. Passez -SftpHostKeyFingerprint ou définissez ATM_SFTP_HOSTKEY."
+}
 
 # 2. Gestion du Service Existant
 if (Get-Service $ServiceName -ErrorAction SilentlyContinue) {
@@ -46,6 +64,7 @@ Write-Host "Création des répertoires d'installation..." -ForegroundColor Cyan
 if (!(Test-Path $InstallDir)) { New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null }
 if (!(Test-Path $ConfigDir)) { New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null }
 if (!(Test-Path $LogDir)) { New-Item -ItemType Directory -Force -Path $LogDir | Out-Null }
+if (!(Test-Path $KeyDir)) { New-Item -ItemType Directory -Force -Path $KeyDir | Out-Null }
 
 # Copie de l'exécutable
 $SourceExe = Join-Path $PSScriptRoot "AtmLogAgent.Service.exe"
@@ -59,12 +78,12 @@ if (Test-Path $SourceExe) {
 }
 
 # 4. Génération de la Clé Cryptographique / SSH
-if (!(Test-Path $KeyPath)) {
+if (!(Test-Path $SshKeyPath)) {
     Write-Host "Génération de la clé cryptographique SSH..." -ForegroundColor Cyan
     # Utilisation de ssh-keygen (Natif Windows 10+)
-    $sshKeygenArgs = "-t ed25519 -f `"$KeyPath`" -N `"`" -q"
+    $sshKeygenArgs = "-t ed25519 -f `"$SshKeyPath`" -N `"`" -q"
     Start-Process -FilePath "ssh-keygen.exe" -ArgumentList $sshKeygenArgs -Wait -NoNewWindow
-    Write-Host "Clé publique générée : $KeyPath.pub" -ForegroundColor Green
+    Write-Host "Clé publique générée : $SshKeyPath.pub" -ForegroundColor Green
     Write-Host "PENSEZ A AJOUTER CETTE CLE AU SERVEUR SFTP !" -ForegroundColor Yellow
 } else {
     Write-Host "Clé cryptographique déjà présente." -ForegroundColor Green
@@ -74,28 +93,75 @@ if (!(Test-Path $KeyPath)) {
 $AppSettingsPath = "$ConfigDir\appsettings.json"
 if (!(Test-Path $AppSettingsPath)) {
     $defaultSettings = @"
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.Hosting.Lifetime": "Information"
-    }
-  },
-  "Sftp": {
-    "Host": "sftp.atm-agent.internal",
-    "Port": 2222,
-    "Username": "atmagent"
-  },
-  "Security": {
-    "LocalEncryptionKeyId": "$KeyPath"
-  },
-  "Paths": {
-    "LogDirectories": [
-      "C:\\NCR\\APTRA\\LOGS",
-      "C:\\Diebold\\Logs"
-    ]
-  }
-}
+	{
+	  "AtmAgent": {
+	    "Atm": {
+	      "BankName": "AUTO",
+	      "Country": "AUTO",
+	      "City": "AUTO",
+	      "AtmId": "AUTO",
+	      "Manufacturer": "AUTO"
+	    },
+	    "Transmission": {
+	      "Protocol": "SFTP",
+	      "Host": "$SftpHost",
+	      "Port": $SftpPort,
+	      "Username": "$SftpUser",
+	      "PrivateKeyPath": "$($SshKeyPath.Replace('\','\\'))",
+	      "PrivateKeyPassphrase": null,
+	      "RemoteBasePath": "/atm-logs",
+	      "CompressBeforeTransmit": true,
+	      "MaxConcurrentTransfers": 3,
+	      "MaxRetryAttempts": 10,
+	      "RetryDelaySeconds": 30,
+	      "FullSyncIntervalHours": 24,
+	      "ConnectionTimeoutSeconds": 30,
+	      "KeepAliveIntervalSeconds": 60
+	    },
+	    "Security": {
+	      "LocalEncryptionKeyId": "$($EncryptionKeyPath.Replace('\','\\'))",
+	      "EnableIntegrityChecks": true,
+	      "EnableTamperDetection": true,
+	      "ValidateServerCertificate": true,
+	      "ServerCertificatePinning": "$SftpHostKeyFingerprint",
+	      "EnableAuditLog": true,
+	      "AuditLogPath": "$($LogDir.Replace('\','\\'))\\audit.log"
+	    },
+	    "LogDiscovery": {
+	      "WatchPaths": [],
+	      "FilePatterns": [ "*.jrn", "*.log", "*.txt", "*.xml", "*.json" ],
+	      "AutoDiscoverAtmPaths": true,
+	      "IncludeSubdirectories": true,
+	      "ExcludedPaths": [
+	        "C:\\Windows\\System32",
+	        "$($DataDir.Replace('\','\\'))"
+	      ],
+	      "PollingIntervalMs": 500
+	    },
+	    "Update": {
+	      "UpdateServerUrl": "https://updates.atm-agent.example.com/api/v1",
+	      "UpdatePublicKeyPath": "$($KeyDir.Replace('\','\\'))\\update_pub.pem",
+	      "CheckIntervalHours": 6,
+	      "EnableAutoUpdate": false,
+	      "AllowHotReload": false,
+	      "MaxRollbackVersions": 3
+	    },
+	    "Monitoring": {
+	      "HeartbeatUrl": "$HeartbeatUrl",
+	      "HeartbeatIntervalSeconds": 60,
+	      "ReportDeviceStatuses": true,
+	      "ReportTransactionStats": true,
+	      "AlertThresholdBufferSizeMb": 100,
+	      "AlertThresholdOfflineMinutes": 30
+	    },
+	    "Retention": {
+	      "LocalLogRetentionDays": 30,
+	      "BufferedDataRetentionDays": 7,
+	      "MaxLocalBufferSizeMb": 500,
+	      "CompressArchivedLogs": true
+	    }
+	  }
+	}
 "@
     Set-Content -Path $AppSettingsPath -Value $defaultSettings -Encoding UTF8
     Write-Host "Configuration par défaut créée : $AppSettingsPath" -ForegroundColor Cyan

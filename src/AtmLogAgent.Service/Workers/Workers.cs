@@ -243,7 +243,7 @@ public sealed class SyncWorker : BackgroundService
                     RemotePath = remotePath,
                     FileSizeBytes = fi.Length,
                     LocalChecksum = checksum,
-                    Compressed = _config.Transmission.CompressBeforeTransmit
+                    Compressed = false
                 };
 
                 await _buffer.EnqueueFileAsync(record, ct);
@@ -258,16 +258,29 @@ public sealed class SyncWorker : BackgroundService
         foreach (var record in filesToSync)
         {
             ct.ThrowIfCancellationRequested();
-            var ok = await _transmission.TransmitFileAsync(record, ct);
-            if (ok)
+            try
             {
-                // Vérifier l'intégrité côté serveur
-                var remoteChecksum = await _transmission.VerifyRemoteChecksumAsync(
-                    record.RemotePath, record.LocalChecksum ?? "", ct)
-                    ? record.LocalChecksum ?? ""
-                    : "";
+                var result = await _transmission.TransmitFileAsync(record, ct);
+                var remoteChecksum = _config.Security.EnableIntegrityChecks
+                    && await _transmission.VerifyRemoteChecksumAsync(
+                        result.RemotePath, result.PayloadChecksum, ct)
+                        ? result.PayloadChecksum
+                        : "";
+
+                if (_config.Security.EnableIntegrityChecks && remoteChecksum.Length == 0)
+                {
+                    _logger.LogWarning(
+                        "Full sync integrity verification failed for {RemotePath}",
+                        result.RemotePath);
+                    continue;
+                }
+
                 await _buffer.MarkFileCompletedAsync(record.Id, remoteChecksum, ct);
                 synced++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "File sync failed for {File}", record.LocalPath);
             }
         }
 
