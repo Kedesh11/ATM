@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using AtmLogAgent.Core.Interfaces;
 using AtmLogAgent.Core.Models;
@@ -79,6 +80,28 @@ public sealed class UpdateService : IUpdateService
         var tempPath = Path.GetTempFileName();
         try
         {
+            if (string.IsNullOrWhiteSpace(_config.Update.UpdatePublicKeyPath)
+                || !File.Exists(_config.Update.UpdatePublicKeyPath))
+            {
+                _logger.LogCritical(
+                    "SECURITY: Auto-update is enabled but UpdatePublicKeyPath is not configured or unreadable.");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(update.Signature))
+            {
+                _logger.LogCritical("SECURITY: Update v{Version} has no signature.", update.Version);
+                return false;
+            }
+
+            if (!IsHttpsUrl(update.DownloadUrl))
+            {
+                _logger.LogCritical(
+                    "SECURITY: Update v{Version} download URL must use HTTPS: {Url}",
+                    update.Version, update.DownloadUrl);
+                return false;
+            }
+
             // 1. Télécharger le package
             _logger.LogDebug("Downloading update from {Url}", update.DownloadUrl);
             using var response = await _httpClient.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -97,13 +120,10 @@ public sealed class UpdateService : IUpdateService
             }
 
             // 3. Vérifier la signature RSA (authenticité de l'éditeur)
-            if (!string.IsNullOrEmpty(_config.Update.UpdatePublicKeyPath))
+            if (!await VerifySignatureAsync(tempPath, update.Signature, ct))
             {
-                if (!await VerifySignatureAsync(tempPath, update.Signature, ct))
-                {
-                    _logger.LogCritical("SECURITY: Update signature verification FAILED for v{Version}", update.Version);
-                    return false;
-                }
+                _logger.LogCritical("SECURITY: Update signature verification FAILED for v{Version}", update.Version);
+                return false;
             }
 
             // 4. Sauvegarder la version actuelle
@@ -111,7 +131,7 @@ public sealed class UpdateService : IUpdateService
 
             // 5. Installer (extraction du zip vers le répertoire de l'agent)
             _logger.LogInformation("Installing update v{Version}", update.Version);
-            System.IO.Compression.ZipFile.ExtractToDirectory(tempPath, _agentDirectory, overwriteFiles: true);
+            await ExtractUpdatePackageAsync(tempPath, _agentDirectory, ct);
 
             _logger.LogInformation("Update v{Version} installed successfully", update.Version);
             return true;
@@ -215,6 +235,54 @@ public sealed class UpdateService : IUpdateService
         {
             _logger.LogError(ex, "Signature verification error");
             return false;
+        }
+    }
+
+    private static bool IsHttpsUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+    private static async Task ExtractUpdatePackageAsync(
+        string packagePath, string destinationDirectory, CancellationToken ct)
+    {
+        var destinationRoot = Path.GetFullPath(destinationDirectory);
+        if (!destinationRoot.EndsWith(Path.DirectorySeparatorChar))
+            destinationRoot += Path.DirectorySeparatorChar;
+
+        using var archive = ZipFile.OpenRead(packagePath);
+        foreach (var entry in archive.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(entry.FullName))
+                continue;
+
+            var destinationPath = Path.GetFullPath(
+                Path.Combine(destinationRoot, entry.FullName));
+
+            if (!destinationPath.StartsWith(destinationRoot, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Update package contains an unsafe path: {entry.FullName}");
+            }
+
+            if (entry.FullName.EndsWith("/", StringComparison.Ordinal)
+                || entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+            {
+                Directory.CreateDirectory(destinationPath);
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            await using var entryStream = entry.Open();
+            await using var output = new FileStream(
+                destinationPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 81920,
+                useAsync: true);
+            await entryStream.CopyToAsync(output, ct);
         }
     }
 }

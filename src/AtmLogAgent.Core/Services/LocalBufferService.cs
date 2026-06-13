@@ -134,14 +134,15 @@ public sealed class LocalBufferService : IBufferService, IAsyncDisposable
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 SELECT id, atm_id, source_file_path, content_encrypted, format,
-                       captured_utc, log_timestamp_utc, remote_path, checksum, retry_count
+                       captured_utc, log_timestamp_utc, remote_path, checksum, retry_count, status
                 FROM log_entries
-                WHERE status = @pending
+                WHERE status IN (@pending, @failed)
                   AND retry_count < @maxRetry
                 ORDER BY captured_utc ASC
                 LIMIT @limit
                 """;
             cmd.Parameters.AddWithValue("@pending", (int)TransmissionStatus.Pending);
+            cmd.Parameters.AddWithValue("@failed", (int)TransmissionStatus.Failed);
             cmd.Parameters.AddWithValue("@maxRetry", _config.Transmission.MaxRetryAttempts);
             cmd.Parameters.AddWithValue("@limit", maxCount);
 
@@ -163,7 +164,7 @@ public sealed class LocalBufferService : IBufferService, IAsyncDisposable
                     RemotePath = reader.IsDBNull(7) ? null : reader.GetString(7),
                     Checksum = reader.IsDBNull(8) ? null : reader.GetString(8),
                     RetryCount = reader.GetInt32(9),
-                    Status = TransmissionStatus.Pending
+                    Status = (TransmissionStatus)reader.GetInt32(10)
                 });
             }
         }, ct);
@@ -252,8 +253,15 @@ public sealed class LocalBufferService : IBufferService, IAsyncDisposable
         await ExecuteAsync(async (conn, ct) =>
         {
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM log_entries WHERE status = @pending";
+            cmd.CommandText = """
+                SELECT COUNT(*)
+                FROM log_entries
+                WHERE status IN (@pending, @failed)
+                  AND retry_count < @maxRetry
+                """;
             cmd.Parameters.AddWithValue("@pending", (int)TransmissionStatus.Pending);
+            cmd.Parameters.AddWithValue("@failed", (int)TransmissionStatus.Failed);
+            cmd.Parameters.AddWithValue("@maxRetry", _config.Transmission.MaxRetryAttempts);
             count = (long)(await cmd.ExecuteScalarAsync(ct))!;
         }, ct);
         return count;
@@ -300,12 +308,26 @@ public sealed class LocalBufferService : IBufferService, IAsyncDisposable
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = status == TransmissionStatus.Failed
-                ? "UPDATE log_entries SET status = @s, retry_count = retry_count + 1, error_message = @err WHERE id = @id"
+                ? """
+                  UPDATE log_entries
+                  SET retry_count = retry_count + 1,
+                      status = CASE
+                          WHEN retry_count + 1 >= @maxRetry THEN @abandoned
+                          ELSE @pending
+                      END,
+                      error_message = @err
+                  WHERE id = @id
+                  """
                 : "UPDATE log_entries SET status = @s WHERE id = @id";
             cmd.Parameters.AddWithValue("@s", (int)status);
             cmd.Parameters.AddWithValue("@id", id.ToString());
             if (status == TransmissionStatus.Failed)
+            {
                 cmd.Parameters.AddWithValue("@err", (object?)error ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@maxRetry", _config.Transmission.MaxRetryAttempts);
+                cmd.Parameters.AddWithValue("@abandoned", (int)TransmissionStatus.Abandoned);
+                cmd.Parameters.AddWithValue("@pending", (int)TransmissionStatus.Pending);
+            }
             await cmd.ExecuteNonQueryAsync(ct);
         }, ct);
     }

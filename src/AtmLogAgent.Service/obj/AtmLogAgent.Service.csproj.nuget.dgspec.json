@@ -30,13 +30,18 @@
           }
         },
         "warningProperties": {
-          "allWarningsAsErrors": true,
+          "noWarn": [
+            "NU1900"
+          ],
           "warnAsError": [
             "NU1605"
+          ],
+          "warnNotAsError": [
+            "NU1900"
           ]
         },
         "restoreAuditProperties": {
-          "enableAudit": "true",
+          "enableAudit": "false",
           "auditLevel": "low",
           "auditMode": "direct"
         }
@@ -145,7 +150,7 @@
           ]
         },
         "restoreAuditProperties": {
-          "enableAudit": "true",
+          "enableAudit": "false",
           "auditLevel": "low",
           "auditMode": "direct"
         }

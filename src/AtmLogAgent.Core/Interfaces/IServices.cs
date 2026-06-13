@@ -41,7 +41,7 @@ public interface ITransmissionService
     Task<bool> TransmitEntryAsync(LogEntry entry, CancellationToken ct = default);
 
     /// <summary>Transmet un fichier complet (sync périodique).</summary>
-    Task<bool> TransmitFileAsync(FileSyncRecord record, CancellationToken ct = default);
+    Task<FileTransmissionResult> TransmitFileAsync(FileSyncRecord record, CancellationToken ct = default);
 
     /// <summary>Vérifie la connectivité avec le serveur distant.</summary>
     Task<bool> TestConnectivityAsync(CancellationToken ct = default);
@@ -156,6 +156,19 @@ public sealed class UpdateInfo
     public string? ReleaseNotes { get; init; }
     public bool IsCritical { get; init; }
     public DateTime ReleasedUtc { get; init; }
+}
+
+/// <summary>
+/// Résultat réel d'un transfert de fichier complet.
+/// Le chemin et le checksum portent sur le payload transmis au serveur
+/// (fichier brut ou archive gzip selon la configuration active).
+/// </summary>
+public sealed class FileTransmissionResult
+{
+    public required string RemotePath { get; init; }
+    public required string PayloadChecksum { get; init; }
+    public required long PayloadSizeBytes { get; init; }
+    public bool Compressed { get; init; }
 }
 
 /// <summary>

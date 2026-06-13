@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AtmLogAgent.Service")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+224edb14c4dbb4be67ca2548f7e86d2c162dff8b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+50cc6f638799a1ca4e45225aa5da66f3e3c7df10")]
 [assembly: System.Reflection.AssemblyProductAttribute("AtmLogAgent.Service")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AtmLogAgent.Service")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

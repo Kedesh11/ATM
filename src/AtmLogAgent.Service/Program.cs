@@ -35,6 +35,13 @@ try
         .AddEnvironmentVariables("ATMAGENT_")
         .AddCommandLine(args);
 
+    var agentConfigSection = builder.Configuration.GetSection("AtmAgent");
+    if (!agentConfigSection.Exists())
+    {
+        throw new InvalidOperationException(
+            "Configuration section 'AtmAgent' is missing. Check appsettings.json or ATMAGENT_ environment variables.");
+    }
+
     // ── Hosting (Windows Service / Systemd) ─────────────────
     builder.Services.AddWindowsService(options =>
     {
@@ -65,7 +72,7 @@ try
     });
 
     // ── Options ──────────────────────────────────────────────
-    builder.Services.Configure<AgentConfiguration>(builder.Configuration);
+    builder.Services.Configure<AgentConfiguration>(agentConfigSection);
 
     // ── Services Core ────────────────────────────────────────
     builder.Services.AddSingleton<IEncryptionService>(sp =>
@@ -116,9 +123,7 @@ try
         using var preResolveCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
         // Résolution temporaire avec la config brute (avant DI complète)
-        var rawConfig = builder.Configuration
-            .GetSection("AtmAgent")
-            .Get<AgentConfiguration>() ?? new AgentConfiguration
+        var rawConfig = agentConfigSection.Get<AgentConfiguration>() ?? new AgentConfiguration
             {
                 Atm          = new AtmIdentity(),
                 Transmission = new TransmissionConfig { Host = "", Port = 22, Username = "", Protocol = "SFTP" },

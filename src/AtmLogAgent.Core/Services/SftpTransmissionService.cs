@@ -96,12 +96,12 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
     // Transmission de fichier complet (sync 24h)
     // ──────────────────────────────────────────────
 
-    public async Task<bool> TransmitFileAsync(FileSyncRecord record, CancellationToken ct = default)
+    public async Task<FileTransmissionResult> TransmitFileAsync(FileSyncRecord record, CancellationToken ct = default)
     {
         if (!File.Exists(record.LocalPath))
         {
             _logger.LogWarning("Local file not found: {Path}", record.LocalPath);
-            return false;
+            throw new FileNotFoundException("Local file scheduled for sync was not found.", record.LocalPath);
         }
 
         return await _retryPolicy.ExecuteAsync(async () =>
@@ -110,17 +110,26 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
             try
             {
                 var remotePath = record.RemotePath;
+                var payloadPath = record.LocalPath;
+                var payloadSize = record.FileSizeBytes;
+                var payloadChecksum = record.LocalChecksum
+                    ?? await _encryption.ComputeFileChecksumAsync(record.LocalPath, ct);
+                var compressed = false;
 
                 EnsureRemoteDirectory(client, Path.GetDirectoryName(remotePath)!.Replace('\\', '/'));
 
-                if (_config.Transmission.CompressBeforeTransmit && !record.Compressed)
+                if (_config.Transmission.CompressBeforeTransmit)
                 {
                     var tempPath = Path.GetTempFileName();
                     try
                     {
                         await CompressFileAsync(record.LocalPath, tempPath, ct);
                         remotePath += ".gz";
-                        await UploadFileWithProgressAsync(client, tempPath, remotePath, ct);
+                        payloadPath = tempPath;
+                        payloadSize = new FileInfo(tempPath).Length;
+                        payloadChecksum = await _encryption.ComputeFileChecksumAsync(tempPath, ct);
+                        compressed = true;
+                        await UploadFileWithProgressAsync(client, payloadPath, remotePath, ct);
                     }
                     finally
                     {
@@ -129,12 +138,19 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
                 }
                 else
                 {
-                    await UploadFileWithProgressAsync(client, record.LocalPath, remotePath, ct);
+                    await UploadFileWithProgressAsync(client, payloadPath, remotePath, ct);
                 }
 
                 _logger.LogInformation("File sync completed: {Local} → {Remote} ({Size:N0} bytes)",
-                    Path.GetFileName(record.LocalPath), remotePath, record.FileSizeBytes);
-                return true;
+                    Path.GetFileName(record.LocalPath), remotePath, payloadSize);
+
+                return new FileTransmissionResult
+                {
+                    RemotePath = remotePath,
+                    PayloadChecksum = payloadChecksum,
+                    PayloadSizeBytes = payloadSize,
+                    Compressed = compressed
+                };
             }
             finally
             {
@@ -321,6 +337,7 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
     private SshClient CreateSshClient()
     {
         var client = new SshClient(BuildConnectionInfo());
+        ConfigureHostKeyValidation(client);
         client.ConnectionInfo.Timeout =
             TimeSpan.FromSeconds(_config.Transmission.ConnectionTimeoutSeconds);
         return client;
@@ -328,22 +345,41 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
 
     private void ConfigureHostKeyValidation(BaseClient client)
     {
-        if (!string.IsNullOrEmpty(_config.Security.ServerCertificatePinning))
+        if (!_config.Security.ValidateServerCertificate)
+        {
+            _logger.LogWarning(
+                "SECURITY: SSH host key validation is disabled for {Host}. Enable it in production.",
+                _config.Transmission.Host);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_config.Security.ServerCertificatePinning))
         {
             client.HostKeyReceived += (_, args) =>
             {
-                var fingerprint = BitConverter.ToString(args.FingerPrint)
-                    .Replace("-", "").ToLowerInvariant();
-                args.CanTrust = fingerprint.Equals(
-                    _config.Security.ServerCertificatePinning.Replace(":", "").ToLowerInvariant(),
-                    StringComparison.OrdinalIgnoreCase);
-
-                if (!args.CanTrust)
-                    _logger.LogCritical(
-                        "SECURITY: SSH host key mismatch! Expected {Expected}, got {Actual}",
-                        _config.Security.ServerCertificatePinning, fingerprint);
+                var fingerprint = NormalizeFingerprint(args.FingerPrint);
+                args.CanTrust = false;
+                _logger.LogCritical(
+                    "SECURITY: SSH host key validation is enabled but no ServerCertificatePinning value is configured. " +
+                    "Refusing {Host}. Observed fingerprint={Fingerprint}",
+                    _config.Transmission.Host, fingerprint);
             };
+            return;
         }
+
+        var expectedFingerprint = NormalizeFingerprint(_config.Security.ServerCertificatePinning);
+        client.HostKeyReceived += (_, args) =>
+        {
+            var actualFingerprint = NormalizeFingerprint(args.FingerPrint);
+            args.CanTrust = actualFingerprint.Equals(
+                expectedFingerprint,
+                StringComparison.OrdinalIgnoreCase);
+
+            if (!args.CanTrust)
+                _logger.LogCritical(
+                    "SECURITY: SSH host key mismatch! Expected {Expected}, got {Actual}",
+                    expectedFingerprint, actualFingerprint);
+        };
     }
 
     // ──────────────────────────────────────────────
@@ -388,6 +424,15 @@ public sealed class SftpTransmissionService : ITransmissionService, IDisposable
                 client.CreateDirectory(current);
         }
     }
+
+    private static string NormalizeFingerprint(byte[] fingerprint) =>
+        Convert.ToHexString(fingerprint).ToLowerInvariant();
+
+    private static string NormalizeFingerprint(string fingerprint) =>
+        fingerprint.Replace(":", "")
+            .Replace("-", "")
+            .Trim()
+            .ToLowerInvariant();
 
     private static async Task CompressFileAsync(string source, string dest, CancellationToken ct)
     {

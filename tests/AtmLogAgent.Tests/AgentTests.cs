@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using AtmLogAgent.Core.Models;
 using AtmLogAgent.Core.Services;
 using FluentAssertions;
@@ -240,6 +241,7 @@ public sealed class LocalBufferServiceTests : IAsyncDisposable
     private readonly LocalBufferService _sut;
     private readonly EncryptionService _encryption;
     private readonly string _tempKeyPath;
+    private readonly string _dataDir;
 
     public LocalBufferServiceTests()
     {
@@ -268,7 +270,8 @@ public sealed class LocalBufferServiceTests : IAsyncDisposable
         };
 
         var options = Microsoft.Extensions.Options.Options.Create(config);
-        Environment.SetEnvironmentVariable("ATMAGENT_DATA_DIR", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+        _dataDir = Path.Combine(Path.GetTempPath(), $"atm_buffer_{Guid.NewGuid():N}");
+        Environment.SetEnvironmentVariable("ATMAGENT_DATA_DIR", _dataDir);
         _sut = new LocalBufferService(options, _encryption, NullLogger<LocalBufferService>.Instance);
     }
 
@@ -310,6 +313,49 @@ public sealed class LocalBufferServiceTests : IAsyncDisposable
 
         var pending = await _sut.DequeuePendingEntriesAsync(10);
         pending.Should().BeEmpty("l'entrée marquée comme complète ne doit plus apparaître");
+    }
+
+    [Fact]
+    public async Task MarkEntryFailed_ShouldKeepEntryRetryableUntilMaxAttempts()
+    {
+        var entry = new LogEntry
+        {
+            AtmId = "ATM_TEST",
+            SourceFilePath = "/logs/retry.jrn",
+            Content = "06:15:00 -> TRANSACTION START",
+            Format = LogFormat.Proprietary
+        };
+
+        await _sut.EnqueueAsync(entry);
+        await _sut.MarkEntryFailedAsync(entry.Id, "network down");
+
+        var retryable = await _sut.DequeuePendingEntriesAsync(10);
+
+        retryable.Should().ContainSingle();
+        retryable[0].Id.Should().Be(entry.Id);
+        retryable[0].RetryCount.Should().Be(1);
+        retryable[0].Status.Should().Be(TransmissionStatus.Pending);
+    }
+
+    [Fact]
+    public async Task MarkEntryFailed_AfterMaxAttempts_ShouldAbandonEntry()
+    {
+        var entry = new LogEntry
+        {
+            AtmId = "ATM_TEST",
+            SourceFilePath = "/logs/abandon.jrn",
+            Content = "06:15:00 -> TRANSACTION START",
+            Format = LogFormat.Proprietary
+        };
+
+        await _sut.EnqueueAsync(entry);
+        await _sut.MarkEntryFailedAsync(entry.Id, "attempt 1");
+        await _sut.MarkEntryFailedAsync(entry.Id, "attempt 2");
+        await _sut.MarkEntryFailedAsync(entry.Id, "attempt 3");
+
+        var retryable = await _sut.DequeuePendingEntriesAsync(10);
+
+        retryable.Should().BeEmpty("une entrée qui dépasse MaxRetryAttempts doit sortir de la file retryable");
     }
 
     [Fact]
@@ -356,6 +402,50 @@ public sealed class LocalBufferServiceTests : IAsyncDisposable
         await _sut.DisposeAsync();
         _encryption.Dispose();
         if (File.Exists(_tempKeyPath)) File.Delete(_tempKeyPath);
+        Environment.SetEnvironmentVariable("ATMAGENT_DATA_DIR", null);
+        if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, recursive: true);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Tests — Configuration de production
+// ══════════════════════════════════════════════════════════════
+
+public sealed class ProductionConfigurationTests
+{
+    [Fact]
+    public void ServiceAppSettings_ShouldUseAtmAgentRootSection()
+    {
+        var path = FindRepositoryFile("src/AtmLogAgent.Service/appsettings.json");
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+
+        var root = doc.RootElement;
+        root.TryGetProperty("AtmAgent", out var atmAgent).Should().BeTrue(
+            "Program.cs bind la configuration depuis la section AtmAgent");
+
+        atmAgent.TryGetProperty("Transmission", out var transmission).Should().BeTrue();
+        transmission.GetProperty("Protocol").GetString().Should().Be("SFTP");
+
+        atmAgent.TryGetProperty("Security", out var security).Should().BeTrue();
+        security.GetProperty("ValidateServerCertificate").GetBoolean().Should().BeTrue();
+        security.GetProperty("ServerCertificatePinning").GetString().Should().NotBeNullOrWhiteSpace();
+
+        atmAgent.TryGetProperty("Update", out var update).Should().BeTrue();
+        update.GetProperty("EnableAutoUpdate").GetBoolean().Should().BeFalse(
+            "les mises à jour automatiques exigent une clé publique de signature explicitement provisionnée");
+    }
+
+    private static string FindRepositoryFile(string relativePath)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(current.FullName, relativePath);
+            if (File.Exists(candidate)) return candidate;
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException($"Could not locate {relativePath} from {AppContext.BaseDirectory}");
     }
 }
 

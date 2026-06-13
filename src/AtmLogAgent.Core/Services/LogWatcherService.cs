@@ -83,9 +83,9 @@ public sealed class LogWatcherService : ILogWatcherService, IDisposable
         _discovery = discovery;
         _encryption = encryption;
         _logger = logger;
-        _positionsFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "AtmLogAgent", "positions.dat");
+        var baseDir = Environment.GetEnvironmentVariable("ATMAGENT_DATA_DIR")
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        _positionsFilePath = Path.Combine(baseDir, "AtmLogAgent", "positions.dat");
 
         // Démarrer le timer de sauvegarde périodique des positions (P2.3)
         _positionSaveTimer = new Timer(
